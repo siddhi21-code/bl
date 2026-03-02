@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sr Billing</title>
+</head>
+<body>
+
+<h2>Billing Software</h2>
+
+<input id="customer" placeholder="Customer Name"><br><br>
+<input id="product" placeholder="Product Name"><br><br>
+<input id="qty" type="number" placeholder="Quantity"><br><br>
+<input id="price" type="number" placeholder="Price"><br><br>
+
+<button onclick="createBill()">Generate Bill</button>
+
+<h3 id="result"></h3>
+
+<script>
+function createBill() {
+  const customer = document.getElementById("customer").value;
+  const product = document.getElementById("product").value;
+  const qty = document.getElementById("qty").value;
+  const price = document.getElementById("price").value;
+
+  fetch("http://localhost:5000/create-bill", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ customer, product, qty, price })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("result").innerText =
+      "Total: ₹" + data.total;
+  });
+}
+</script>
+
+</body>
+</html>

@@ -1,64 +1,71 @@
 const express = require("express");
 const sqlite3 = require("sqlite3").verbose();
-const cors = require("cors");
-const bodyParser = require("body-parser");
+const escpos = require("escpos");
+escpos.USB = require("escpos-usb");
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.static("public"));
 
-const db = new sqlite3.Database("./billing.db");
+const db = new sqlite3.Database("./database.db");
 
 // Create Table
 db.run(`
-  CREATE TABLE IF NOT EXISTS bills (
+CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer TEXT,
     product TEXT,
-    qty INTEGER,
     price REAL,
+    qty INTEGER,
     total REAL,
     date TEXT
-  )
+)
 `);
 
-// Create Bill API
-app.post("/create-bill", (req, res) => {
-  const { customer, product, qty, price } = req.body;
-  const total = qty * price;
-  const date = new Date().toLocaleString();
+// Add Invoice
+app.post("/addInvoice", (req, res) => {
+    const { product, price, qty, total, date } = req.body;
 
-  db.run(
-    `INSERT INTO bills (customer, product, qty, price, total, date)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [customer, product, qty, price, total, date]
-  );
+    db.run(
+        "INSERT INTO invoices (product, price, qty, total, date) VALUES (?, ?, ?, ?, ?)",
+        [product, price, qty, total, date],
+        function (err) {
+            if (err) return res.status(500).json(err);
+            res.json({ message: "Saved Successfully" });
+        }
+    );
+});
 
-  // ===== Printer Code =====
-  const escpos = require("escpos");
-  escpos.USB = require("escpos-usb");
+// Get All Invoices
+app.get("/getInvoices", (req, res) => {
+    db.all("SELECT * FROM invoices ORDER BY id DESC", [], (err, rows) => {
+        if (err) return res.status(500).json(err);
+        res.json(rows);
+    });
+});
 
-  const device = new escpos.USB();
-  const printer = new escpos.Printer(device);
+// Print Invoice
+app.post("/print", (req, res) => {
+    const { product, total } = req.body;
 
-  device.open(function () {
-    printer
-      .text("Siddhi Billing Software")
-      .text("---------------------------")
-      .text("Customer: " + customer)
-      .text("Product: " + product)
-      .text("Qty: " + qty)
-      .text("Price: " + price)
-      .text("Total: " + total)
-      .text("---------------------------")
-      .text("Thank You!")
-      .cut()
-      .close();
-  });
+    const device = new escpos.USB();
+    const printer = new escpos.Printer(device);
 
-  res.json({ message: "Bill Created & Printed", total });
+    device.open(() => {
+        printer
+            .align("CT")
+            .text("SRBilling")
+            .text("--------------------------")
+            .align("LT")
+            .text("Product: " + product)
+            .text("Total: ₹" + total)
+            .text("--------------------------")
+            .cut()
+            .close();
+    });
+
+    res.json({ message: "Printed" });
 });
 
 app.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
+    console.log("SRBilling running on http://localhost:5000");
 });
